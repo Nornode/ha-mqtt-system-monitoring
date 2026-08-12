@@ -185,6 +185,28 @@ State (not retained):
   linux_monitor/{hostname}/service/{name}/state           ← per-service JSON
 ```
 
+## Alert Blueprint
+
+An automation blueprint is included that sends Android push notifications when thresholds are exceeded.
+
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FNornode%2Fha-mqtt-system-monitoring%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsystem_monitor_alerts.yaml)
+
+Or copy the file manually to `/config/blueprints/automation/` and reload blueprints.
+
+**What you configure in the UI:**
+
+| Input | Description |
+|-------|-------------|
+| Monitored Host | The MQTT device created by the monitor |
+| Disk Usage Threshold | Default 85 % — alert sustained for 2 min |
+| Memory Usage Threshold | Default 90 % — alert sustained for 2 min |
+| Load Average (15 min) | Default 2.0 — alert sustained for 5 min |
+| Last Seen Timeout | Default 5 min — host considered offline |
+| Service State Sensor | Optional — alerts when a service enters `failed` state |
+| Android Device(s) | One or more phones with the HA companion app |
+
+Notifications are tagged per host and alert type so they replace themselves rather than stacking. Each alert type gets its own `channel: SystemAlerts` channel on Android, letting you configure sound and vibration independently in the companion app settings.
+
 ---
 
 ## Uninstallation
