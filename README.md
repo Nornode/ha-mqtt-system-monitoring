@@ -19,10 +19,11 @@ Each host appears in Home Assistant as a single device, with all its sensors gro
 
 | File | Purpose |
 |------|---------|
-| `config.sh` | All user-facing configuration |
+| `config.sh` | All user-facing configuration — edit this before running the installer |
 | `monitor.sh` | Collects metrics and publishes MQTT discovery + state |
 | `install.sh` | Installs as a systemd service + timer (requires root) |
 | `uninstall.sh` | Removes the service cleanly (requires root) |
+| `check-deps.sh` | Pre-install dependency and configuration check (also run automatically by `install.sh`) |
 
 ---
 
@@ -30,27 +31,38 @@ Each host appears in Home Assistant as a single device, with all its sensors gro
 
 **1. Clone or copy the files to the target host.**
 
-**2. Run the installer:**
+**2. Edit `config.sh` before installing:**
+
+```bash
+nano config.sh
+```
+
+At minimum, set `MQTT_BROKER` to your broker's IP or hostname. The installer copies this file to `/etc/mqtt-monitor/config.sh` on first run, so editing it here means it arrives pre-configured — no need to find and edit it again afterwards.
+
+See the [Configuration](#configuration) section for all available options, including per-service health checks and log file monitoring.
+
+**3. (Optional) Run the dependency and configuration check:**
+
+```bash
+bash ./check-deps.sh
+```
+
+This checks OS compatibility, required tools, systemd availability, and validates your `config.sh` — including whether each service in `MONITORED_SERVICES` exists as a systemd unit, and whether any `SERVICE_CHECK_CMD` / `SERVICE_LOG_FILE` / `SERVICE_LOG_PATTERN` entries are consistent. The installer runs this automatically and will abort if any required check fails, but running it manually first gives you a cleaner view of any issues before committing to the install.
+
+**4. Run the installer:**
 
 ```bash
 sudo ./install.sh
 ```
 
 This will:
+- Run `check-deps.sh` and abort if any required check fails
 - Install `mosquitto-clients` if not already present
 - Copy `monitor.sh` to `/opt/mqtt-monitor/`
-- Copy `config.sh` to `/etc/mqtt-monitor/config.sh` (only if it does not already exist)
+- Copy `config.sh` to `/etc/mqtt-monitor/config.sh` (only if it does not already exist there)
 - Create a systemd one-shot service and a timer that fires it on the configured interval
 
-**3. Edit the config:**
-
-```bash
-sudo nano /etc/mqtt-monitor/config.sh
-```
-
-At minimum, set `MQTT_BROKER` to your broker's IP address.
-
-**4. Run once to verify:**
+**5. Run once to verify:**
 
 ```bash
 sudo systemctl start mqtt-monitor.service
@@ -59,7 +71,7 @@ journalctl -u mqtt-monitor.service -n 50
 
 Home Assistant should discover the device within seconds under **Settings → Devices & Services → MQTT**.
 
-**After changing the config, restart the timer:**
+**After changing the config, restart the timer to apply:**
 
 ```bash
 sudo systemctl restart mqtt-monitor.timer
@@ -69,7 +81,7 @@ sudo systemctl restart mqtt-monitor.timer
 
 ## Configuration
 
-All options live in `/etc/mqtt-monitor/config.sh` (installed) or `./config.sh` (local use).
+Edit `config.sh` in the repo directory before installing, or edit the installed copy at `/etc/mqtt-monitor/config.sh` afterwards.
 
 ```bash
 # Required

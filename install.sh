@@ -14,7 +14,13 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-echo "==> Checking dependencies..."
+echo "==> Running dependency and compatibility check..."
+bash "$SCRIPT_DIR/check-deps.sh" || {
+    echo "ERROR: Dependency check failed — installation aborted." >&2
+    exit 1
+}
+
+echo "==> Ensuring runtime dependencies are installed..."
 if ! command -v mosquitto_pub &>/dev/null; then
     echo "    mosquitto_pub not found — installing mosquitto-clients..."
     apt-get install -y mosquitto-clients
