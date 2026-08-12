@@ -1,5 +1,7 @@
 # MQTT System Monitor
 
+![Home Assistant auto-discovered device](docs/HA_auto-discovered.png)
+
 A set of portable bash scripts that publish system metrics from Debian/Linux hosts to an MQTT broker, with automatic sensor discovery for [Home Assistant](https://www.home-assistant.io/integrations/mqtt/).
 
 Each host appears in Home Assistant as a single device, with all its sensors grouped under the hostname.
