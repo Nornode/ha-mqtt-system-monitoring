@@ -191,65 +191,116 @@ conditions: []
 actions:
   - variables:
       host_name: "{{ device_attr(var_device, 'name') | default('unknown host') }}"
-      disk_eid: >
+      disk_eid: >-
         {{ device_entities(var_device)
            | select('search', '_disk_usage')
            | list | first | default('') }}
-      memory_eid: >
+      disk_free_eid: >-
+        {{ device_entities(var_device)
+           | select('search', '_disk_free')
+           | list | first | default('') }}
+      memory_eid: >-
         {{ device_entities(var_device)
            | select('search', '_memory_usage')
            | list | first | default('') }}
-      load_eid: >
+      memory_free_eid: >-
+        {{ device_entities(var_device)
+           | select('search', '_memory_free')
+           | list | first | default('') }}
+      load_1m_eid: >-
+        {{ device_entities(var_device)
+           | select('search', '_load_1m')
+           | list | first | default('') }}
+      load_5m_eid: >-
+        {{ device_entities(var_device)
+           | select('search', '_load_5m')
+           | list | first | default('') }}
+      load_15m_eid: >-
         {{ device_entities(var_device)
            | select('search', '_load_15m')
            | list | first | default('') }}
-      notif_title: >
-        {% if trigger.id == 'disk_high' %}
-          💽 Disk Alert — {{ host_name }}
-        {% elif trigger.id == 'memory_high' %}
-          🧠 Memory Alert — {{ host_name }}
-        {% elif trigger.id == 'load_high' %}
-          ⚡ High Load — {{ host_name }}
-        {% elif trigger.id == 'host_offline' %}
-          🔴 Host Offline — {{ host_name }}
-        {% elif trigger.id == 'service_failed' %}
-          🚨 Service Failed — {{ host_name }}
-        {% else %}
-          ⚠️ System Alert — {{ host_name }}
-        {% endif %}
-      notif_message: >
-        {% if trigger.id == 'disk_high' and disk_eid != '' %}
-          Disk usage is {{ states(disk_eid) | round(1) }}%
-          (threshold: {{ var_disk_threshold }}%)
-        {% elif trigger.id == 'memory_high' and memory_eid != '' %}
-          Memory usage is {{ states(memory_eid) | round(1) }}%
-          (threshold: {{ var_memory_threshold }}%)
-        {% elif trigger.id == 'load_high' and load_eid != '' %}
-          15-minute load average is {{ states(load_eid) | round(2) }}
-          (threshold: {{ var_load_threshold }})
-        {% elif trigger.id == 'host_offline' %}
-          No report received in over {{ var_last_seen_timeout }} minute(s).
-          Check the host for connectivity issues.
-        {% elif trigger.id == 'service_failed' and var_service_entity %}
-          {{ state_attr(var_service_entity, 'friendly_name')
-             | default(var_service_entity) }} entered a failed state.
-        {% else %}
-          Check the host for details.
-        {% endif %}
-      notif_icon: >
-        {% if trigger.id == 'disk_high' %}mdi:harddisk-remove
-        {% elif trigger.id == 'memory_high' %}mdi:memory
-        {% elif trigger.id == 'load_high' %}mdi:gauge-full
-        {% elif trigger.id == 'host_offline' %}mdi:server-off
-        {% elif trigger.id == 'service_failed' %}mdi:cog-off
-        {% else %}mdi:server-alert
-        {% endif %}
-      notif_color: >
-        {% if trigger.id in ['host_offline', 'service_failed'] %}
-          #e74c3c
-        {% else %}
-          #e67e22
-        {% endif %}
+      last_seen_eid: >-
+        {{ device_entities(var_device)
+           | select('search', '_last_seen')
+           | list | first | default('') }}
+      notif_title: >-
+        {%- if trigger.id == 'disk_high' -%}💽 Disk Alert — {{ host_name }}
+        {%- elif trigger.id == 'memory_high' -%}🧠 Memory Alert — {{ host_name }}
+        {%- elif trigger.id == 'load_high' -%}⚡ High Load — {{ host_name }}
+        {%- elif trigger.id == 'host_offline' -%}🔴 Host Offline — {{ host_name }}
+        {%- elif trigger.id == 'service_failed' -%}🚨 Service Failed — {{ host_name }}
+        {%- else -%}⚠️ System Alert — {{ host_name }}
+        {%- endif -%}
+      notif_message: |-
+        {%- set ts = now().strftime('%H:%M UTC  •  %a %d %b %Y') -%}
+        {%- if trigger.id == 'disk_high' and disk_eid != '' -%}
+        ⏰ {{ ts }}
+
+        💽 Disk: {{ states(disk_eid) | round(1) }}%  (limit: {{ var_disk_threshold }}%)
+           Free: {{ states(disk_free_eid) | float(0) | round(1) }} GiB
+
+        RAM: {{ states(memory_eid) | float(0) | round(1) }}% used  •  {{ states(memory_free_eid) | int(0) }} MiB free
+        Load: {{ states(load_1m_eid) | default('?') }} / {{ states(load_5m_eid) | default('?') }} / {{ states(load_15m_eid) | default('?') }}  (1m / 5m / 15m)
+        {%- elif trigger.id == 'memory_high' and memory_eid != '' -%}
+        ⏰ {{ ts }}
+
+        🧠 Memory: {{ states(memory_eid) | round(1) }}%  (limit: {{ var_memory_threshold }}%)
+           Free: {{ states(memory_free_eid) | int(0) }} MiB
+
+        Disk: {{ states(disk_eid) | float(0) | round(1) }}% used  •  {{ states(disk_free_eid) | float(0) | round(1) }} GiB free
+        Load: {{ states(load_1m_eid) | default('?') }} / {{ states(load_5m_eid) | default('?') }} / {{ states(load_15m_eid) | default('?') }}  (1m / 5m / 15m)
+        {%- elif trigger.id == 'load_high' and load_15m_eid != '' -%}
+        ⏰ {{ ts }}
+
+        ⚡ Load: {{ states(load_1m_eid) | default('?') }} / {{ states(load_5m_eid) | default('?') }} / {{ states(load_15m_eid) | default('?') }}  (1m / 5m / 15m)
+           15m threshold: {{ var_load_threshold }}
+
+        RAM: {{ states(memory_eid) | float(0) | round(1) }}% used  •  {{ states(memory_free_eid) | int(0) }} MiB free
+        Disk: {{ states(disk_eid) | float(0) | round(1) }}% used  •  {{ states(disk_free_eid) | float(0) | round(1) }} GiB free
+        {%- elif trigger.id == 'host_offline' -%}
+        {%- set ls_raw = states(last_seen_eid) if last_seen_eid != '' else '' -%}
+        {%- set ns = namespace(offline_dur='unknown', ls_display='unknown') -%}
+        {%- if ls_raw not in ['', 'unavailable', 'unknown', 'none'] -%}
+        {%- set ls_dt = as_datetime(ls_raw) -%}
+        {%- set diff_s = (now() - ls_dt).total_seconds() | int -%}
+        {%- set ns.offline_dur = (diff_s // 3600) ~ 'h ' ~ ((diff_s % 3600) // 60) ~ 'm' if diff_s >= 3600 else (diff_s // 60) ~ 'm ' ~ (diff_s % 60) ~ 's' -%}
+        {%- set ns.ls_display = ls_dt.strftime('%H:%M UTC  •  %a %d %b %Y') -%}
+        {%- endif -%}
+        ⏰ {{ ts }}
+
+        🔴 Offline for: {{ ns.offline_dur }}
+           Last seen: {{ ns.ls_display }}
+        {%- elif trigger.id == 'service_failed' and var_service_entity and var_service_entity != [] -%}
+        {%- set svc_parts = var_service_entity.split('_svc_') -%}
+        {%- set svc_name = svc_parts[1][:-6] if svc_parts | length > 1 else var_service_entity -%}
+        {%- set svc_base = var_service_entity[:-6] -%}
+        {%- set uptime_s = states(svc_base ~ '_uptime') | int(0) -%}
+        {%- set uptime_str = (uptime_s // 3600) ~ 'h ' ~ ((uptime_s % 3600) // 60) ~ 'm' if uptime_s >= 3600 else (uptime_s // 60) ~ 'm' -%}
+        ⏰ {{ ts }}
+
+        🚨 {{ svc_name }}  →  {{ states(var_service_entity) | default('failed') }}
+           Restarts: {{ states(svc_base ~ '_restarts') | int(0) }}  •  Last uptime: {{ uptime_str }}
+           Errors: {{ states(svc_base ~ '_errors_1m') | int(0) }} in 1m  /  {{ states(svc_base ~ '_errors_5m') | int(0) }} in 5m
+
+        Load: {{ states(load_1m_eid) | default('?') }} / {{ states(load_5m_eid) | default('?') }} / {{ states(load_15m_eid) | default('?') }}  (1m / 5m / 15m)
+        RAM: {{ states(memory_eid) | float(0) | round(1) }}% used  •  {{ states(memory_free_eid) | int(0) }} MiB free
+        {%- else -%}
+        ⏰ {{ ts }}
+
+        ⚠️ Check {{ host_name }} for details.
+        {%- endif -%}
+      notif_icon: >-
+        {%- if trigger.id == 'disk_high' -%}mdi:harddisk-remove
+        {%- elif trigger.id == 'memory_high' -%}mdi:memory
+        {%- elif trigger.id == 'load_high' -%}mdi:gauge-full
+        {%- elif trigger.id == 'host_offline' -%}mdi:server-off
+        {%- elif trigger.id == 'service_failed' -%}mdi:cog-off
+        {%- else -%}mdi:server-alert
+        {%- endif -%}
+      notif_color: >-
+        {%- if trigger.id in ['host_offline', 'service_failed'] -%}#e74c3c
+        {%- else -%}#e67e22
+        {%- endif -%}
 
   - action: !input notify_target
     data:
