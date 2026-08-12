@@ -107,11 +107,13 @@ blueprint:
     notify_target:
       name: Notification Service
       description: >
-        Select your Android companion app notification service.
-        For multiple phones, create a notification group in configuration.yaml
-        (notify: platform: group) and select that group here.
+        Your Android companion app notification service name, e.g.
+        notify.mobile_app_my_phone. Find it under Developer Tools → Services
+        and filter by "notify". For multiple phones, configure a notification
+        group in configuration.yaml and enter that group service name here.
+      default: notify.notify
       selector:
-        notify:
+        text:
 
 # ── Automation-level variables ─────────────────────────────────────────────
 # Assign !input values here so they are available inside trigger templates.
