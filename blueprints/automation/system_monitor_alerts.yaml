@@ -105,14 +105,13 @@ blueprint:
 
     # ── Notification targets ──────────────────────────────────────────────────
     notify_target:
-      name: Android Device(s) to Notify
+      name: Notification Service
       description: >
-        One or more Android phones with the Home Assistant companion app.
-        Multiple devices can be selected.
+        Select your Android companion app notification service.
+        For multiple phones, create a notification group in configuration.yaml
+        (notify: platform: group) and select that group here.
       selector:
-        device:
-          integration: mobile_app
-          multiple: true
+        notify:
 
 # ── Automation-level variables ─────────────────────────────────────────────
 # Assign !input values here so they are available inside trigger templates.
@@ -250,22 +249,18 @@ actions:
           #e67e22
         {% endif %}
 
-  - repeat:
-      for_each: !input notify_target
-      sequence:
-        - device_id: "{{ repeat.item }}"
-          domain: mobile_app
-          type: notify
-          title: "{{ notif_title }}"
-          message: "{{ notif_message }}"
-          data:
-            priority: high
-            ttl: 0
-            notification_icon: "{{ notif_icon }}"
-            color: "{{ notif_color }}"
-            tag: "mqtt_monitor_{{ host_name | slugify }}_{{ trigger.id }}"
-            channel: SystemAlerts
-            importance: high
+  - action: !input notify_target
+    data:
+      title: "{{ notif_title }}"
+      message: "{{ notif_message }}"
+      data:
+        priority: high
+        ttl: 0
+        notification_icon: "{{ notif_icon }}"
+        color: "{{ notif_color }}"
+        tag: "mqtt_monitor_{{ host_name | slugify }}_{{ trigger.id }}"
+        channel: SystemAlerts
+        importance: high
 
 mode: parallel
 max: 10

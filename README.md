@@ -203,7 +203,7 @@ Or copy the file manually to `/config/blueprints/automation/` and reload bluepri
 | Load Average (15 min) | Default 2.0 — alert sustained for 5 min |
 | Last Seen Timeout | Default 5 min — host considered offline |
 | Service State Sensor | Optional — alerts when a service enters `failed` state |
-| Android Device(s) | One or more phones with the HA companion app |
+| Notification Service | Android companion app notify service (e.g. `notify.mobile_app_my_phone`). For multiple phones use a `notify: group:` in `configuration.yaml`. |
 
 Notifications are tagged per host and alert type so they replace themselves rather than stacking. Each alert type gets its own `channel: SystemAlerts` channel on Android, letting you configure sound and vibration independently in the companion app settings.
 
