@@ -43,6 +43,15 @@ if [[ ! -f "$CONFIG_DIR/config.sh" ]]; then
     echo ""
 else
     echo "    Config already exists — not overwritten."
+    if ! diff -q "$SCRIPT_DIR/config.sh" "$CONFIG_DIR/config.sh" &>/dev/null; then
+        echo ""
+        echo "    !! WARNING: installed config differs from the bundled template."
+        echo "    !!   Installed : $CONFIG_DIR/config.sh"
+        echo "    !!   Template  : $SCRIPT_DIR/config.sh"
+        echo "    !! Review the diff to pick up new options:"
+        echo "    !!   diff $SCRIPT_DIR/config.sh $CONFIG_DIR/config.sh"
+        echo ""
+    fi
 fi
 
 # Read interval from the installed config
@@ -79,9 +88,10 @@ AccuracySec=5
 WantedBy=timers.target
 EOF
 
-echo "==> Enabling and starting timer..."
+echo "==> Enabling and (re)starting timer..."
 systemctl daemon-reload
-systemctl enable --now mqtt-monitor.timer
+systemctl enable mqtt-monitor.timer
+systemctl restart mqtt-monitor.timer
 
 echo ""
 echo "Installation complete!"
