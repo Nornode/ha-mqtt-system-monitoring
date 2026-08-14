@@ -33,9 +33,9 @@ if ! command -v mosquitto_pub &>/dev/null; then
 fi
 
 # Ensure optional per-service arrays exist even if config.sh omitted them
-declare -A SERVICE_CHECK_CMD=() 2>/dev/null || true
-declare -A SERVICE_LOG_FILE=()  2>/dev/null || true
-declare -A SERVICE_LOG_PATTERN=() 2>/dev/null || true
+declare -A SERVICE_CHECK_CMD 2>/dev/null || true
+declare -A SERVICE_LOG_FILE  2>/dev/null || true
+declare -A SERVICE_LOG_PATTERN 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Hostname (sanitised: lowercase, non-alphanumeric/underscore → underscore)
