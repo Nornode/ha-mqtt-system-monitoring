@@ -81,13 +81,21 @@ to_int() {
     echo "$v"
 }
 
-# Count journald entries for a unit at or above 'err' priority in the given window.
+# Count journald entries for a unit at or above 'warning' priority in the given window.
 # Window examples: "1 minute", "5 minutes"
 count_journal_errors() {
     local unit="$1" window="$2"
+    # Pre-compute an absolute timestamp with GNU date.
+    # Passing "X ago" directly to journalctl --since is unreliable: journalctl's
+    # own time parser varies across systemd versions and silently returns nothing
+    # when it can't parse the string, making the count always 0.
+    local since
+    since=$(date --date="${window} ago" '+%Y-%m-%d %H:%M:%S' 2>/dev/null) || { echo 0; return; }
     local count
-    count=$(journalctl -u "$unit" --since "${window} ago" -p err -q --no-pager 2>/dev/null | wc -l || echo 0)
-    to_int "$count"
+    # '; true' prevents set -o pipefail from triggering on a non-zero journalctl
+    # exit, which would otherwise cause a double-write into the command substitution.
+    count=$(journalctl -u "$unit" --since "$since" -p warning -q --no-pager 2>/dev/null | wc -l; true)
+    to_int "${count:-0}"
 }
 
 # Run a custom health-check command (timeout 10 s). Prints "ok" or "fail".
@@ -152,7 +160,7 @@ publish_sensor_discovery() {
     [[ "$dev_class" != "timestamp" ]] && extras+="\"state_class\":\"measurement\","
     [[ -n "$icon" ]]      && extras+="\"icon\":\"${icon}\","
 
-    local payload="{\"name\":\"${HOST} ${display_name}\",\"unique_id\":\"${HOST}_${suffix}\",\"state_topic\":\"linux_monitor/${HOST}/state\",\"value_template\":\"{{ value_json.${json_key} }}\",${extras}\"device\":${DEVICE_JSON}}"
+    local payload="{\"name\":\"${HOST} ${display_name}\",\"unique_id\":\"${HOST}_${suffix}\",\"state_topic\":\"linux_monitor/${HOST}/state\",\"value_template\":\"{{ value_json.${json_key} }}\",${extras}\"expire_after\":180,\"device\":${DEVICE_JSON}}"
     mqtt_pub "${DISCOVERY_PREFIX}/sensor/${HOST}_${suffix}/config" "$payload" "retain"
 }
 
@@ -175,13 +183,13 @@ register_service_sensors() {
         [[ -n "$dev_class" && "$dev_class" != "timestamp" ]] && ex+="\"state_class\":\"measurement\","
         [[ -z "$dev_class" ]] && ex+="\"state_class\":\"measurement\","
         [[ -n "$icon" ]]      && ex+="\"icon\":\"${icon}\","
-        local p="{\"name\":\"${HOST} svc ${svc} ${name}\",\"unique_id\":\"${HOST}_svc_${svc}_${id}\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.${key} }}\",${ex}\"device\":${DEVICE_JSON}}"
+        local p="{\"name\":\"${HOST} svc ${svc} ${name}\",\"unique_id\":\"${HOST}_svc_${svc}_${id}\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.${key} }}\",${ex}\"expire_after\":180,\"device\":${DEVICE_JSON}}"
         mqtt_pub "${DISCOVERY_PREFIX}/sensor/${HOST}_svc_${svc}_${id}/config" "$p" "retain"
     }
 
     # Active sub-state (string: running / exited / failed / dead / …)
     # No unit, no state_class — it's an enum, not a measurement
-    local p="{\"name\":\"${HOST} svc ${svc} state\",\"unique_id\":\"${HOST}_svc_${svc}_state\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.active_sub_state }}\",\"icon\":\"mdi:cog-outline\",\"device\":${DEVICE_JSON}}"
+    local p="{\"name\":\"${HOST} svc ${svc} state\",\"unique_id\":\"${HOST}_svc_${svc}_state\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.active_sub_state }}\",\"icon\":\"mdi:cog-outline\",\"expire_after\":180,\"device\":${DEVICE_JSON}}"
     mqtt_pub "${DISCOVERY_PREFIX}/sensor/${HOST}_svc_${svc}_state/config" "$p" "retain"
 
     _svc_sensor "restarts"   "restarts"       "restart_count"       "restarts"  ""           "mdi:restart"
@@ -192,7 +200,7 @@ register_service_sensors() {
 
     # Optional: custom health check → binary_sensor
     if [[ -n "${SERVICE_CHECK_CMD[$svc]:-}" ]]; then
-        p="{\"name\":\"${HOST} svc ${svc} check\",\"unique_id\":\"${HOST}_svc_${svc}_check\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.check_ok }}\",\"payload_on\":\"ok\",\"payload_off\":\"fail\",\"device_class\":\"running\",\"device\":${DEVICE_JSON}}"
+        p="{\"name\":\"${HOST} svc ${svc} check\",\"unique_id\":\"${HOST}_svc_${svc}_check\",\"state_topic\":\"${state_t}\",\"value_template\":\"{{ value_json.check_ok }}\",\"payload_on\":\"ok\",\"payload_off\":\"fail\",\"device_class\":\"running\",\"expire_after\":180,\"device\":${DEVICE_JSON}}"
         mqtt_pub "${DISCOVERY_PREFIX}/binary_sensor/${HOST}_svc_${svc}_check/config" "$p" "retain"
     fi
 

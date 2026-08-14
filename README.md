@@ -1,6 +1,6 @@
 # MQTT System Monitor
 
-![Home Assistant auto-discovered device](docs/HA_auto-discovered.png)
+![Home Assistant auto-discovered device](docs/HA_auto-discovered.png){width=400}
 
 A set of portable bash scripts that publish system metrics from Debian/Linux hosts to an MQTT broker, with automatic sensor discovery for [Home Assistant](https://www.home-assistant.io/integrations/mqtt/).
 
@@ -134,8 +134,8 @@ Each service in `MONITORED_SERVICES` produces the following sensors. State publi
 | restarts | restarts | Restart count since last boot |
 | uptime | `s` | Seconds since the service last entered active state |
 | memory | `B` | RSS from cgroup (requires cgroups v2; 0 if unavailable) |
-| errors 1m | errors | journald entries at `err` priority or higher in the last 1 minute |
-| errors 5m | errors | journald entries at `err` priority or higher in the last 5 minutes |
+| errors 1m | errors | journald entries at `warning` priority or higher in the last 1 minute |
+| errors 5m | errors | journald entries at `warning` priority or higher in the last 5 minutes |
 
 #### Optional: custom health check
 
@@ -184,6 +184,47 @@ State (not retained):
   linux_monitor/{hostname}/state                          ← system metrics JSON
   linux_monitor/{hostname}/service/{name}/state           ← per-service JSON
 ```
+
+## Detecting offline or stale hosts
+
+### Why this matters
+
+When a monitored host stops reporting — due to a crash, reboot, power loss, or network outage — it simply stops publishing MQTT messages. Without any extra configuration, Home Assistant has no way to distinguish a stale reading from a current one: the last-published values stay on screen indefinitely, looking healthy even when the host is long gone.
+
+### Option A — `expire_after` (built-in, automatic)
+
+Every sensor published by this project includes `"expire_after": 180` in its MQTT discovery config. This tells the HA MQTT integration to mark a sensor `unavailable` if no new message arrives on its state topic within 180 seconds (3 minutes). As soon as the host stops reporting, its sensors transition from their last value to `unavailable` — making the problem visible in dashboards and triggering any automations that watch for `unavailable` state.
+
+This is automatic and requires no extra HA configuration.
+
+> **Why 3 minutes?** The default reporting interval is 60 s. Three minutes gives a rebooting server time to come back up, reconnect to the broker, and publish a fresh reading — without showing stale data in the meantime.
+
+### Option B — Template binary sensor (explicit on/off entity)
+
+`expire_after` marks sensors `unavailable`, but sometimes you want a dedicated `on`/`off` binary sensor — for example to show a clear problem indicator on a dashboard, use it as a condition in other automations, or apply a different timeout threshold.
+
+Add this to your HA `configuration.yaml`, replacing `sensor.myhost_last_seen` with the actual entity ID for your host (find it under **Settings → Devices & Services → MQTT → *your host* → Sensors**):
+
+```yaml
+template:
+  - binary_sensor:
+      - name: "myhost Offline"
+        unique_id: myhost_offline
+        device_class: problem
+        icon: mdi:server-off
+        state: >
+          {% set last_seen = as_timestamp(
+               states('sensor.myhost_last_seen'), default=0) %}
+          {{ last_seen > 0 and (as_timestamp(now()) - last_seen) > 180 }}
+        availability: >
+          {{ states('sensor.myhost_last_seen') not in ['unavailable', 'unknown'] }}
+```
+
+The `availability` template prevents false positives during HA restarts or MQTT reconnects, when the `last_seen` sensor may briefly show `unavailable` even though the host is online. Without it, the binary sensor would briefly turn `on` every time HA restarts.
+
+Both mechanisms complement each other: `expire_after` keeps all sensors clean by marking them `unavailable` at the MQTT layer, while the template binary sensor gives you an explicit, stable entity for dashboards and automations.
+
+---
 
 ## Alert Blueprint
 
